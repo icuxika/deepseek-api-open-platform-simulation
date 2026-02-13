@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,7 +58,7 @@ class AuthServiceTest {
             user.setId(1L);
             return user;
         });
-        when(jwtUtils.generateToken(anyLong(), anyString())).thenReturn("test-token");
+        when(jwtUtils.generateToken(anyLong(), anyString(), anyInt())).thenReturn("test-token");
 
         AuthResponse response = authService.register(request);
 
@@ -121,10 +122,11 @@ class AuthServiceTest {
         user.setUsername("testuser");
         user.setPassword("encodedPassword");
         user.setBalance(BigDecimal.valueOf(100));
+        user.setTokenVersion(0);
 
         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
-        when(jwtUtils.generateToken(user.getId(), user.getEmail())).thenReturn("test-token");
+        when(jwtUtils.generateToken(user.getId(), user.getEmail(), user.getTokenVersion())).thenReturn("test-token");
 
         AuthResponse response = authService.login(request);
 
@@ -207,6 +209,7 @@ class AuthServiceTest {
         User user = new User();
         user.setId(1L);
         user.setPassword("oldEncodedPassword");
+        user.setTokenVersion(0);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("oldPassword", "oldEncodedPassword")).thenReturn(true);
@@ -217,6 +220,7 @@ class AuthServiceTest {
         });
 
         verify(userRepository).save(any(User.class));
+        assertEquals(1, user.getTokenVersion());
     }
 
     @Test
@@ -235,5 +239,32 @@ class AuthServiceTest {
 
         assertEquals("当前密码错误", exception.getMessage());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("登出成功 - tokenVersion 增加")
+    void logout_Success() {
+        User user = new User();
+        user.setId(1L);
+        user.setTokenVersion(0);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        authService.logout(1L);
+
+        assertEquals(1, user.getTokenVersion());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    @DisplayName("登出失败 - 用户不存在")
+    void logout_UserNotFound_ThrowsException() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            authService.logout(999L);
+        });
+
+        assertEquals("用户不存在", exception.getMessage());
     }
 }

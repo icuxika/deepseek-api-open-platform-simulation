@@ -88,9 +88,9 @@ function handleMenuSelect(key: string) {
   router.push('/' + key)
 }
 
-function handleUserSelect(key: string) {
+async function handleUserSelect(key: string) {
   if (key === 'logout') {
-    userStore.logout()
+    await userStore.logout()
     router.push('/login')
   } else if (key === 'profile') {
     router.push('/profile')

@@ -91,6 +91,12 @@ function handleChangePassword() {
 }
 
 async function handleBind(provider: 'gitee' | 'github') {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    message.error('请先登录')
+    return
+  }
+  
   try {
     let response
     if (provider === 'gitee') {
@@ -98,7 +104,8 @@ async function handleBind(provider: 'gitee' | 'github') {
     } else {
       response = await oauthApi.getGithubAuthUrl()
     }
-    window.location.href = response.url + '&state=bind'
+    const separator = response.url.includes('?') ? '&' : '?'
+    window.location.href = response.url + separator + 'state=bind:' + token
   } catch (error) {
     console.error('获取授权链接失败:', error)
     message.error('获取授权链接失败')

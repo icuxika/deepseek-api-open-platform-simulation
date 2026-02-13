@@ -162,6 +162,7 @@ public class GitHubOAuthService {
         user.setPassword(UUID.randomUUID().toString());
         user.setBalance(BigDecimal.ZERO);
         user.setAvatarUrl(githubUser.getAvatarUrl());
+        user.setTokenVersion(0);
         
         return userRepository.save(user);
     }
@@ -187,8 +188,8 @@ public class GitHubOAuthService {
         });
     }
 
-    private AuthResponse buildAuthResponse(User user) {
-        String token = jwtUtils.generateToken(user.getId(), user.getEmail());
+    public AuthResponse buildAuthResponse(User user) {
+        String token = jwtUtils.generateToken(user.getId(), user.getEmail(), user.getTokenVersion());
         
         AuthResponse response = new AuthResponse();
         response.setToken(token);

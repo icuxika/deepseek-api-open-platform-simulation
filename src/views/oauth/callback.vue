@@ -20,6 +20,8 @@ onMounted(async () => {
     return
   }
 
+  const isBindMode = state?.startsWith('bind:')
+
   try {
     let response
     
@@ -35,7 +37,7 @@ onMounted(async () => {
     userStore.setUser(response.user as any)
     await userStore.loadUserData()
     
-    if (state === 'bind') {
+    if (isBindMode) {
       message.success('账号绑定成功')
       router.push('/profile')
     } else {
@@ -43,7 +45,7 @@ onMounted(async () => {
     }
   } catch (error: any) {
     console.error('OAuth login failed:', error)
-    if (state === 'bind') {
+    if (isBindMode) {
       message.error(error.message || '绑定失败')
       router.push('/profile')
     } else {

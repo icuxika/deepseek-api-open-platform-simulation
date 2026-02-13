@@ -1,9 +1,12 @@
 package com.deepseek.apiplatform.controller;
 
 import com.deepseek.apiplatform.dto.*;
+import com.deepseek.apiplatform.entity.User;
 import com.deepseek.apiplatform.entity.UserOAuth;
 import com.deepseek.apiplatform.entity.enums.OAuthProvider;
 import com.deepseek.apiplatform.repository.UserOAuthRepository;
+import com.deepseek.apiplatform.repository.UserRepository;
+import com.deepseek.apiplatform.security.JwtUtils;
 import com.deepseek.apiplatform.security.UserPrincipal;
 import com.deepseek.apiplatform.service.GiteeOAuthService;
 import com.deepseek.apiplatform.service.GitHubOAuthService;
@@ -12,8 +15,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -22,13 +27,19 @@ public class OAuthController {
     private final GiteeOAuthService giteeOAuthService;
     private final GitHubOAuthService gitHubOAuthService;
     private final UserOAuthRepository userOAuthRepository;
+    private final UserRepository userRepository;
+    private final JwtUtils jwtUtils;
 
     public OAuthController(GiteeOAuthService giteeOAuthService, 
                           GitHubOAuthService gitHubOAuthService,
-                          UserOAuthRepository userOAuthRepository) {
+                          UserOAuthRepository userOAuthRepository,
+                          UserRepository userRepository,
+                          JwtUtils jwtUtils) {
         this.giteeOAuthService = giteeOAuthService;
         this.gitHubOAuthService = gitHubOAuthService;
         this.userOAuthRepository = userOAuthRepository;
+        this.userRepository = userRepository;
+        this.jwtUtils = jwtUtils;
     }
 
     @GetMapping("/gitee")
@@ -56,9 +67,13 @@ public class OAuthController {
             throw new RuntimeException("获取用户信息失败");
         }
         
-        if ("bind".equals(state) && principal != null) {
-            giteeOAuthService.bindAccount(principal.getId(), userInfo, tokenResponse.getAccessToken());
-            return ResponseEntity.ok(giteeOAuthService.loginOrRegister(userInfo, tokenResponse.getAccessToken()));
+        Long bindUserId = resolveBindUserId(state, principal);
+        
+        if (bindUserId != null) {
+            giteeOAuthService.bindAccount(bindUserId, userInfo, tokenResponse.getAccessToken());
+            User user = userRepository.findById(bindUserId)
+                    .orElseThrow(() -> new RuntimeException("用户不存在"));
+            return ResponseEntity.ok(giteeOAuthService.buildAuthResponse(user));
         } else {
             return ResponseEntity.ok(giteeOAuthService.loginOrRegister(userInfo, tokenResponse.getAccessToken()));
         }
@@ -89,12 +104,43 @@ public class OAuthController {
             throw new RuntimeException("获取用户信息失败");
         }
         
-        if ("bind".equals(state) && principal != null) {
-            gitHubOAuthService.bindAccount(principal.getId(), userInfo, tokenResponse.getAccessToken());
-            return ResponseEntity.ok(gitHubOAuthService.loginOrRegister(userInfo, tokenResponse.getAccessToken()));
+        Long bindUserId = resolveBindUserId(state, principal);
+        
+        if (bindUserId != null) {
+            gitHubOAuthService.bindAccount(bindUserId, userInfo, tokenResponse.getAccessToken());
+            User user = userRepository.findById(bindUserId)
+                    .orElseThrow(() -> new RuntimeException("用户不存在"));
+            return ResponseEntity.ok(gitHubOAuthService.buildAuthResponse(user));
         } else {
             return ResponseEntity.ok(gitHubOAuthService.loginOrRegister(userInfo, tokenResponse.getAccessToken()));
         }
+    }
+
+    private Long resolveBindUserId(String state, UserPrincipal principal) {
+        if (principal != null) {
+            return principal.getId();
+        }
+        
+        if (state != null && state.startsWith("bind:")) {
+            try {
+                String token = state.substring(5);
+                if (jwtUtils.validateToken(token)) {
+                    Long userId = jwtUtils.getUserIdFromToken(token);
+                    Integer tokenVersion = jwtUtils.getTokenVersionFromToken(token);
+                    User user = userRepository.findById(userId).orElse(null);
+                    if (user != null) {
+                        int tv = tokenVersion != null ? tokenVersion : 0;
+                        int utv = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+                        if (tv == utv) {
+                            return userId;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     @GetMapping("/bindings")

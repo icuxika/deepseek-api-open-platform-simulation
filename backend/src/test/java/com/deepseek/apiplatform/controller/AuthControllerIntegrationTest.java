@@ -1,7 +1,6 @@
 package com.deepseek.apiplatform.controller;
 
-import com.deepseek.apiplatform.dto.LoginRequest;
-import com.deepseek.apiplatform.dto.RegisterRequest;
+import com.deepseek.apiplatform.dto.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -159,5 +158,149 @@ class AuthControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.email").value("authuser@example.com"))
             .andExpect(jsonPath("$.username").value("authuser"));
+    }
+
+    @Test
+    @DisplayName("登出成功")
+    void logout_Success() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest();
+        registerRequest.setEmail("logout@example.com");
+        registerRequest.setUsername("logoutuser");
+        registerRequest.setPassword("password123");
+
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        String token = objectMapper.readTree(response).get("token").asText();
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("登出后 Token 失效")
+    void tokenInvalid_AfterLogout() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest();
+        registerRequest.setEmail("tokeninvalid@example.com");
+        registerRequest.setUsername("tokeninvaliduser");
+        registerRequest.setPassword("password123");
+
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        String token = objectMapper.readTree(response).get("token").asText();
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    @DisplayName("修改密码后 Token 失效")
+    void tokenInvalid_AfterPasswordChange() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest();
+        registerRequest.setEmail("passchange@example.com");
+        registerRequest.setUsername("passchangeuser");
+        registerRequest.setPassword("oldpassword");
+
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        String token = objectMapper.readTree(response).get("token").asText();
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk());
+
+        ChangePasswordRequest changePasswordRequest = new ChangePasswordRequest();
+        changePasswordRequest.setCurrentPassword("oldpassword");
+        changePasswordRequest.setNewPassword("newpassword123");
+
+        mockMvc.perform(put("/api/auth/password")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(changePasswordRequest)))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+            .andExpect(status().is4xxClientError());
+
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setEmail("passchange@example.com");
+        loginRequest.setPassword("newpassword123");
+
+        MvcResult newLoginResult = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String newToken = objectMapper.readTree(newLoginResult.getResponse().getContentAsString())
+                .get("token").asText();
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + newToken))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("重新登录后获得新 Token")
+    void newToken_AfterRelogin() throws Exception {
+        RegisterRequest registerRequest = new RegisterRequest();
+        registerRequest.setEmail("relogin@example.com");
+        registerRequest.setUsername("reloginuser");
+        registerRequest.setPassword("password123");
+
+        MvcResult registerResult = mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String oldToken = objectMapper.readTree(registerResult.getResponse().getContentAsString())
+                .get("token").asText();
+
+        mockMvc.perform(post("/api/auth/logout")
+                .header("Authorization", "Bearer " + oldToken))
+            .andExpect(status().isOk());
+
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setEmail("relogin@example.com");
+        loginRequest.setPassword("password123");
+
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String newToken = objectMapper.readTree(loginResult.getResponse().getContentAsString())
+                .get("token").asText();
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + newToken))
+            .andExpect(status().isOk());
     }
 }

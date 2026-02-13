@@ -26,6 +26,9 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
     
+    @Column(name = "token_version")
+    private Integer tokenVersion = 0;
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
@@ -60,6 +63,9 @@ public class User {
     
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    
+    public Integer getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(Integer tokenVersion) { this.tokenVersion = tokenVersion; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

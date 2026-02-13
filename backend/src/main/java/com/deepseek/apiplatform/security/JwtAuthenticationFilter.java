@@ -1,5 +1,7 @@
 package com.deepseek.apiplatform.security;
 
+import com.deepseek.apiplatform.entity.User;
+import com.deepseek.apiplatform.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,9 +17,11 @@ import java.util.Collections;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtils jwtUtils;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtUtils jwtUtils) {
+    public JwtAuthenticationFilter(JwtUtils jwtUtils, UserRepository userRepository) {
         this.jwtUtils = jwtUtils;
+        this.userRepository = userRepository;
     }
     
     @Override
@@ -28,16 +32,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         if (StringUtils.hasText(token) && jwtUtils.validateToken(token)) {
             Long userId = jwtUtils.getUserIdFromToken(token);
+            Integer tokenVersion = jwtUtils.getTokenVersionFromToken(token);
             
-            UserPrincipal principal = new UserPrincipal(userId);
+            User user = userRepository.findById(userId).orElse(null);
             
-            UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
-            
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (user != null && isTokenVersionValid(tokenVersion, user.getTokenVersion())) {
+                UserPrincipal principal = new UserPrincipal(userId);
+                
+                UsernamePasswordAuthenticationToken authentication = 
+                        new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+                
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
         
         filterChain.doFilter(request, response);
+    }
+    
+    private boolean isTokenVersionValid(Integer tokenVersion, Integer userTokenVersion) {
+        int tv = tokenVersion != null ? tokenVersion : 0;
+        int utv = userTokenVersion != null ? userTokenVersion : 0;
+        return tv == utv;
     }
     
     private String getTokenFromRequest(HttpServletRequest request) {

@@ -36,10 +36,11 @@ public class AuthService {
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setBalance(BigDecimal.ZERO);
+        user.setTokenVersion(0);
         
         user = userRepository.save(user);
         
-        String token = jwtUtils.generateToken(user.getId(), user.getEmail());
+        String token = jwtUtils.generateToken(user.getId(), user.getEmail(), user.getTokenVersion());
         
         return new AuthResponse(token, "Bearer", toUserResponse(user));
     }
@@ -52,9 +53,19 @@ public class AuthService {
             throw new RuntimeException("密码错误");
         }
         
-        String token = jwtUtils.generateToken(user.getId(), user.getEmail());
+        String token = jwtUtils.generateToken(user.getId(), user.getEmail(), user.getTokenVersion());
         
         return new AuthResponse(token, "Bearer", toUserResponse(user));
+    }
+    
+    @Transactional
+    public void logout(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        
+        int currentVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
+        user.setTokenVersion(currentVersion + 1);
+        userRepository.save(user);
     }
     
     public UserResponse getUserById(Long id) {
@@ -89,7 +100,9 @@ public class AuthService {
             throw new RuntimeException("当前密码错误");
         }
         
+        int currentVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0;
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setTokenVersion(currentVersion + 1);
         userRepository.save(user);
     }
     

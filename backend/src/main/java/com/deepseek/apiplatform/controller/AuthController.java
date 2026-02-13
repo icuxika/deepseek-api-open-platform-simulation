@@ -27,6 +27,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
     
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+        authService.logout(principal.getId());
+        return ResponseEntity.ok().build();
+    }
+    
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(authService.getUserById(principal.getId()));
@@ -44,7 +50,7 @@ public class AuthController {
     }
     
     @PutMapping("/password")
-    public ResponseEntity<?> changePassword(
+    public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody ChangePasswordRequest request) {
         authService.changePassword(

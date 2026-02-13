@@ -51,6 +51,11 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
   
+  logout: () =>
+    apiRequest<void>('/auth/logout', {
+      method: 'POST',
+    }),
+  
   getMe: () => apiRequest<unknown>('/auth/me'),
   
   updateProfile: (data: { username: string; email: string }) =>

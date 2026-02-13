@@ -19,13 +19,14 @@ public class JwtUtils {
         return new SecretKeySpec(jwtSecret.getBytes(), "HmacSHA256");
     }
     
-    public String generateToken(Long userId, String email) {
+    public String generateToken(Long userId, String email, Integer tokenVersion) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
         
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("email", email)
+                .claim("tokenVersion", tokenVersion != null ? tokenVersion : 0)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -48,6 +49,29 @@ public class JwtUtils {
                 .parseSignedClaims(token)
                 .getPayload();
         return claims.get("email", String.class);
+    }
+    
+    public Integer getTokenVersionFromToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            Object version = claims.get("tokenVersion");
+            if (version == null) {
+                return 0;
+            }
+            if (version instanceof Integer) {
+                return (Integer) version;
+            }
+            if (version instanceof Number) {
+                return ((Number) version).intValue();
+            }
+            return Integer.parseInt(version.toString());
+        } catch (Exception e) {
+            return 0;
+        }
     }
     
     public boolean validateToken(String token) {
