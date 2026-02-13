@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: deepseek-api-platform
+  
+  datasource:
+    url: jdbc:sqlite:deepseek_api.db
+    driver-class-name: org.sqlite.JDBC
+    
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET:deepseek-api-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+oauth:
+  gitee:
+    client-id: ${OAUTH_GITEE_CLIENT_ID:}
+    client-secret: ${OAUTH_GITEE_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_GITEE_REDIRECT_URI:http://localhost:5173/oauth/callback/gitee}
+  github:
+    client-id: ${OAUTH_GITHUB_CLIENT_ID:}
+    client-secret: ${OAUTH_GITHUB_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_GITHUB_REDIRECT_URI:http://localhost:5173/oauth/callback/github}
+
+logging:
+  level:
+    com.deepseek: DEBUG
+    org.hibernate.SQL: DEBUG
